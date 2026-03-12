@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use std::ffi::c_int;
 use std::sync::Arc;
+use std::{borrow::Cow, path::Path};
 
 use crate::{
     WhisperContextParameters, WhisperError, WhisperInnerContext, WhisperState, WhisperTokenId,
@@ -27,11 +27,14 @@ impl WhisperContext {
     ///
     /// # C++ equivalent
     /// `struct whisper_context * whisper_init_from_file_with_params_no_state(const char * path_model, struct whisper_context_params params);`
-    pub fn new_with_params(
-        path: &str,
+    pub fn new_with_params<P>(
+        path: P,
         parameters: WhisperContextParameters,
-    ) -> Result<Self, WhisperError> {
-        let ctx = WhisperInnerContext::new_with_params(path, parameters)?;
+    ) -> Result<Self, WhisperError>
+    where
+        P: AsRef<Path>,
+    {
+        let ctx = WhisperInnerContext::new_with_params(path.as_ref(), parameters)?;
         Ok(Self::wrap(ctx))
     }
 

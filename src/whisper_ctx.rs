@@ -2,6 +2,27 @@ use crate::error::WhisperError;
 use crate::WhisperTokenId;
 use std::borrow::Cow;
 use std::ffi::{c_int, CStr, CString};
+use std::path::Path;
+
+#[cfg(unix)]
+fn path_to_bytes(path: &Path) -> Result<Cow<'_, [u8]>, WhisperError> {
+    use std::os::unix::ffi::OsStrExt as _;
+
+    Ok(path.as_os_str().as_bytes().into())
+}
+
+#[cfg(not(unix))]
+fn path_to_bytes(path: &Path) -> Result<Cow<'_, [u8]>, WhisperError> {
+    path.to_str()
+        .map(str::as_bytes)
+        .map(Cow::Borrowed)
+        // We can't really tell up to what point the path is valid
+        // UTF-8, so just assume worst case.
+        .ok_or_else(|| WhisperError::InvalidUtf8 {
+            error_len: None,
+            valid_up_to: 0,
+        })
+}
 
 /// Safe Rust wrapper around a Whisper context.
 ///
@@ -26,10 +47,10 @@ impl WhisperInnerContext {
     /// # C++ equivalent
     /// `struct whisper_context * whisper_init_from_file_with_params_no_state(const char * path_model, struct whisper_context_params params);`
     pub fn new_with_params(
-        path: &str,
+        path: &Path,
         parameters: WhisperContextParameters,
     ) -> Result<Self, WhisperError> {
-        let path_cstr = CString::new(path)?;
+        let path_cstr = CString::new(path_to_bytes(path)?)?;
         let ctx = unsafe {
             whisper_rs_sys::whisper_init_from_file_with_params_no_state(
                 path_cstr.as_ptr(),
