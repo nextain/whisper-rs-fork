@@ -118,7 +118,10 @@ fn main() {
         });
     }
 
-    if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
+    if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() || !has_libclang() {
+        if !has_libclang() {
+            println!("cargo:warning=libclang not found — using bundled bindings.rs");
+        }
         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))
             .expect("Failed to copy bindings.rs");
     } else {
@@ -151,6 +154,19 @@ fn main() {
                 .header("whisper.cpp/ggml/include/ggml-vulkan.h")
                 .clang_arg("-DGGML_USE_VULKAN=1");
         }
+
+        // Blocklist Linux libc types that cause size assertion failures on Windows.
+        // These types come from glibc headers and are not part of the whisper.cpp API.
+        bindings = bindings
+            .blocklist_type("_G_fpos_t")
+            .blocklist_type("_G_fpos64_t")
+            .blocklist_type("_IO_FILE")
+            .blocklist_type("_IO_lock_t")
+            .blocklist_type("_IO_marker")
+            .blocklist_type("_IO_codecvt")
+            .blocklist_type("_IO_wide_data")
+            .blocklist_type("__FILE")
+            .blocklist_type("FILE");
 
         let bindings = bindings
             .clang_arg("-I./whisper.cpp/")
@@ -494,6 +510,43 @@ fn find_file_recursive(dir: &std::path::Path, name_prefix: &str) -> Option<PathB
         }
     }
     None
+}
+
+/// Check if libclang is available without panicking.
+/// bindgen panics inside Builder::generate() if libclang is missing.
+/// We detect this by checking common paths and env vars.
+fn has_libclang() -> bool {
+    // 1. LIBCLANG_PATH explicitly set
+    if env::var("LIBCLANG_PATH").is_ok() {
+        return true;
+    }
+    // 2. LLVM_CONFIG_PATH set
+    if env::var("LLVM_CONFIG_PATH").is_ok() {
+        return true;
+    }
+    // 3. Try to find clang/llvm-config in PATH
+    if Command::new("llvm-config").arg("--version").output().is_ok() {
+        return true;
+    }
+    // 4. Check well-known LLVM install paths
+    let candidates: Vec<PathBuf> = if cfg!(windows) {
+        // Windows: LLVM typically installed via winget/choco
+        let program_files = env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".into());
+        vec![
+            PathBuf::from(&program_files).join("LLVM\\bin\\libclang.dll"),
+            PathBuf::from("C:\\Program Files\\LLVM\\bin\\libclang.dll"),
+        ]
+    } else {
+        // Linux: libclang-dev package
+        vec![
+            PathBuf::from("/usr/lib/llvm-18/lib/libclang.so"),
+            PathBuf::from("/usr/lib/llvm-17/lib/libclang.so"),
+            PathBuf::from("/usr/lib/llvm-16/lib/libclang.so"),
+            PathBuf::from("/usr/lib/llvm-14/lib/libclang.so"),
+            PathBuf::from("/usr/lib/libclang.so"),
+        ]
+    };
+    candidates.iter().any(|p| p.exists())
 }
 
 fn get_whisper_cpp_version(whisper_root: &std::path::Path) -> std::io::Result<Option<String>> {
