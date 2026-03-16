@@ -17,9 +17,19 @@ overview:
   principle: "Text rules get forgotten; mechanical enforcement doesn't."
   pillars:
     - name: hooks
-      description: "Claude Code PostToolUse hooks that intercept edits and commands in real-time"
+      description: "Claude Code hooks that intercept edits and commands in real-time"
     - name: progress_files
       description: "JSON session handoff files that survive context compaction and session boundaries"
+
+  limitations: |
+    Harness catches STYLE violations only (formatting, linting, file guards, naming).
+    It CANNOT catch:
+    - Design quality (wrong abstraction, poor generality)
+    - Performance regressions
+    - Semantic correctness (logic errors)
+    - Scope creep (too many changes in one commit)
+    Do NOT trust harness passage as proof of upstream quality.
+    Phase 3 (critical review) exists specifically to catch what harness cannot.
 
 hooks:
   location: .claude/hooks/
@@ -28,6 +38,23 @@ hooks:
     input: "stdin JSON — { tool_name, tool_input, cwd, session_id }"
     output: "stdout JSON — { reason, hookSpecificOutput: { hookEventName, additionalContext } }"
     blocking: "Set decision: 'block' in output to prevent tool execution (PreToolUse only)"
+
+  trigger_timing_principle: |
+    PreToolUse = runs BEFORE tool execution. Can block (decision: 'block').
+    PostToolUse = runs AFTER tool execution. Advisory only — cannot undo.
+
+    Design rule: If you need to ENFORCE a rule (prevent bad commits, block file edits),
+    use PreToolUse. If you only need to REMIND (triple-mirror, checklist), use PostToolUse.
+    A PostToolUse hook that tries to block is ineffective — the action already happened.
+
+  authoring_rule: |
+    When writing hooks, NEVER guess Claude Code API format.
+    Read existing working hooks (e.g., naia-os/.claude/hooks/) first.
+    Common bugs from guessing:
+    - ESM import vs CJS require (depends on package.json presence)
+    - stdin reading pattern (async for await, not readFileSync)
+    - Output format (JSON with specific schema, not free text)
+    - settings.json structure (nested under hooks.PreToolUse/PostToolUse)
 
   sync_entry_points:
     file: sync-entry-points.js

@@ -133,6 +133,9 @@ phases:
     rules:
       - "Stay within plan scope"
       - "Follow upstream patterns, don't invent new ones"
+      - "Design decision conflicts: flag for user, don't decide autonomously"
+      - "  Example: minimization principle vs future extensibility — present tradeoff, let user decide"
+      - "  If AI decides, user cannot defend the code end-to-end in upstream review"
 
   review:
     description: "Self-review against plan AND original issue"
