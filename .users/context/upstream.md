@@ -43,11 +43,25 @@ Process: Issue first → PR → Merge with PR number reference.
 - Neutral technical tone
 
 ### Imports
-No strict import ordering enforced — varies across files. Follow rustfmt default grouping. Do not impose stricter order than upstream.
+No strict import ordering enforced — varies across files. Follow rustfmt default grouping.
 
 ### Error Handling
 - Library code: `Result<T, WhisperError>` — never panic
-- build.rs: `panic!()` acceptable for unrecoverable errors
+- build.rs: `panic!()` or `.expect("reason")` for unrecoverable errors
+- build.rs anti-pattern: `.ok()?` or silent Option returns — never swallow errors
+
+### Anti-patterns (signals "AI-generated code" to upstream maintainer)
+
+Detected in PR #275 and #272 rejections:
+
+- **Decorative comment separators** (`// ─── Section ───`) — upstream uses zero
+- **Capitalized emphasis** (`// NOT`, `// MUST`, `// CRITICAL`) — upstream uses neutral tone
+- **Hardcoded version-specific paths** (`/usr/lib/llvm-18`, `llvm-17`) — snapshot of one machine
+- **Manual editing of generated files** (`sys/src/bindings.rs`) — regeneration wipes all edits
+- **Two approaches to the same problem** (cmake crate + raw `Command::new("cmake")`) — unclear intent
+- **Over-documentation** — upstream density is minimal
+- **Shipping unverified code** (`// NOTE: untested`) — upstream expects tested contributions
+- **Re-solving upstream's solutions** (`has_libclang()` when `WHISPER_DONT_GENERATE_BINDINGS` exists)
 
 ## Platform Patterns
 
@@ -70,6 +84,8 @@ MSVC enum repr:
 pub enum CEnum { ... }
 ```
 
+**Anti-pattern**: NEVER use `#[cfg(target_os = "linux")]` in src/ or sys/src/. Use `#[cfg(unix)]` — it covers Linux, macOS, BSD. `target_os = "linux"` excludes macOS/BSD and breaks those platforms. Exception: build.rs may use `cfg!(target_os)` for link flags where the distinction matters.
+
 ### Platform code locations (4 total)
 - `src/whisper_ctx.rs:7-25` — path_to_bytes
 - `src/common_logging.rs:51-54` — GGMLLogLevel repr
@@ -83,17 +99,29 @@ pub enum CEnum { ... }
 - Without env var → run bindgen → on error, fallback to pre-generated
 - Pre-generated: `sys/src/bindings.rs` (5964 lines, Linux-only, has glibc types)
 - **Cross-platform issue**: glibc types fail on Windows (size assertion overflow)
+- **NEVER manually edit** `sys/src/bindings.rs`. Platform differences must be solved in build.rs or src/ wrapper code.
 
 ### CMake
 - Static build (`BUILD_SHARED_LIBS=OFF`)
 - `WHISPER_*`, `GGML_*`, `CMAKE_*` env vars forwarded
 - Always links: whisper, ggml, ggml-base, ggml-cpu
 - Windows: `/utf-8` cxxflag + advapi32
+- **Consistency rule**: ALL cmake invocations through cmake crate. No raw `Command::new("cmake")`.
 
 ### Features
 - Default: none
 - GPU: cuda, metal, vulkan, hipblas, coreml, intel-sycl, openblas
 - Utility: raw-api, log_backend, tracing_backend, openmp, force-debug, test-with-tiny-model
+
+## Testing
+
+- `test-with-tiny-model` feature enables integration tests with real whisper.cpp model
+- Every new feature or platform fix MUST include tests
+- No shipping untested code — `// NOTE: untested` is not acceptable (cited in PR #275 rejection)
+
+## Re-solving Anti-pattern
+
+Do NOT add new mechanisms for problems upstream already solved. Example: upstream provides `WHISPER_DONT_GENERATE_BINDINGS` for skipping bindgen. Adding `has_libclang()` auto-detection re-solves the same problem with a more fragile approach. Always check upstream.yaml build_system section first.
 
 ## Windows Support (upstream)
 

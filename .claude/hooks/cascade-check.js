@@ -1,8 +1,10 @@
 /**
- * cascade-check.js — Triple-mirror enforcement for whisper-rs-nx
+ * cascade-check.js — Triple-mirror + generated file guard for whisper-rs-nx
  *
- * Trigger: PostToolUse (Edit|Write on context files)
- * Purpose: Remind to update all three layers when context files change.
+ * Trigger: PostToolUse (Edit|Write)
+ * Purpose:
+ *   1. Remind to update all three mirror layers when context files change
+ *   2. WARN when editing generated files (sys/src/bindings.rs)
  */
 
 const input = JSON.parse(await new Promise((r) => {
@@ -17,6 +19,16 @@ if (toolName !== "Edit" && toolName !== "Write") {
 }
 
 const filePath = (input.tool_input?.file_path || "").replace(/\\/g, "/");
+
+// Guard: sys/src/bindings.rs is GENERATED — never edit manually
+if (filePath.includes("sys/src/bindings.rs")) {
+	process.stdout.write(
+		"[BLOCKED] sys/src/bindings.rs is a GENERATED file. NEVER edit manually. " +
+		"Platform differences must be solved in build.rs (blocklist, post-processing) " +
+		"or in src/ wrapper code (per-enum cfg_attr). See .agents/context/upstream.yaml pre_generated_bindings.must_not_edit."
+	);
+	process.exit(0);
+}
 
 const isAgentsContext = filePath.includes(".agents/context/");
 const isUsersContext = filePath.includes(".users/context/") && !filePath.includes("/ko/");

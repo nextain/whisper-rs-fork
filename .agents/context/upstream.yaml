@@ -81,7 +81,28 @@ code_style:
   error_handling:
     library_code: "Result<T, WhisperError> — never panic"
     error_type: "WhisperError enum (16 variants, with From<T> conversions)"
-    build_rs: "panic!() acceptable for unrecoverable config errors"
+    build_rs: "panic!() or .expect('reason') for unrecoverable config errors"
+    build_rs_anti_pattern: ".ok()? or silent Option returns — never swallow errors in build.rs"
+
+  anti_patterns:
+    description: "Patterns that signal 'AI-generated code' to upstream maintainer"
+    detected_in_pr_275_and_272:
+      - pattern: "Decorative comment separators (// ─── Section ───)"
+        why: "Upstream uses zero decorative separators"
+      - pattern: "Capitalized emphasis in comments (// NOT, // MUST, // CRITICAL)"
+        why: "Upstream uses neutral lowercase tone"
+      - pattern: "Hardcoded version-specific paths (/usr/lib/llvm-18, llvm-17, ...)"
+        why: "Snapshot of one machine, breaks everywhere else"
+      - pattern: "Manual editing of generated files (sys/src/bindings.rs)"
+        why: "Regeneration wipes all manual edits, signals no build system understanding"
+      - pattern: "Two different approaches to the same problem in the same file"
+        why: "cmake crate + raw Command::new('cmake') = unclear intent"
+      - pattern: "Over-documentation (comments explaining obvious code)"
+        why: "Upstream density is minimal"
+      - pattern: "// NOTE: ... is untested — shipping unverified code"
+        why: "Upstream expects tested contributions"
+      - pattern: "Re-solving problems upstream already solved"
+        why: "has_libclang() when WHISPER_DONT_GENERATE_BINDINGS already exists"
 
 # ── Platform Patterns ─────────────────────────────────────────
 
@@ -105,6 +126,12 @@ platform_patterns:
     build_rs_platform: |
       if cfg!(target_os = "windows") { ... }
       cfg_if::cfg_if! { if #[cfg(target_os = "windows")] { ... } }
+    anti_pattern_target_os_linux: |
+      NEVER use #[cfg(target_os = "linux")] in src/ or sys/src/ code.
+      Use #[cfg(unix)] instead — it covers Linux, macOS, BSD.
+      cfg(target_os = "linux") excludes macOS/BSD and breaks those platforms.
+      Exception: build.rs may use cfg!(target_os) for link flags where
+      the distinction between Linux and macOS actually matters.
 
   locations:
     - "src/whisper_ctx.rs:7-25 — path_to_bytes (Unix OsStrExt vs UTF-8)"
@@ -134,6 +161,11 @@ build_system:
     lines: 5964
     generator: "bindgen 0.72.1"
     generated_on: "Linux"
+    must_not_edit: |
+      NEVER manually edit sys/src/bindings.rs. It is generated output.
+      Any whisper.cpp update → bindgen regeneration → all manual edits lost.
+      Platform differences must be solved in build.rs (blocklist, post-processing)
+      or in src/ wrapper code (per-enum cfg_attr), NOT in the generated file.
     contents:
       - "__BindgenBitfieldUnit helpers"
       - "Opaque structs (whisper_context, whisper_state — zero-size)"
@@ -164,6 +196,10 @@ build_system:
     profile: "Release (RelWithDebInfo for debug)"
     static: "BUILD_SHARED_LIBS=OFF"
     env_passthrough: "WHISPER_*, GGML_*, CMAKE_* → CMake defines (except WHISPER_DONT_GENERATE_BINDINGS)"
+    consistency_rule: |
+      ALL cmake invocations MUST go through the cmake crate (cmake::Config).
+      Do NOT mix cmake crate with raw Command::new("cmake") in the same build.rs.
+      If the cmake crate cannot handle a use case, extend the approach — don't bypass it.
     linked_libs:
       always: [whisper, ggml, ggml-base, ggml-cpu]
       cuda: [ggml-cuda]
@@ -223,6 +259,30 @@ windows_status:
     - "HipBLAS panics on Windows (rocm-5.7)"
     - "No visible Windows CI"
   platform_code_count: 4  # path, 2x enum repr, build.rs
+
+# ── Testing ───────────────────────────────────────────────────
+
+testing:
+  upstream_pattern: "test-with-tiny-model feature flag enables integration tests with real whisper.cpp model"
+  rule: |
+    Every new feature or platform fix MUST include tests.
+    No shipping untested code — "// NOTE: untested" is not acceptable.
+  what_to_test:
+    new_feature: "Integration test exercising the feature end-to-end"
+    platform_fix: "Build verification on affected platform (CI or local)"
+    build_system_change: "cargo build with WHISPER_DONT_GENERATE_BINDINGS=1 + without"
+  anti_pattern: |
+    Submitting code with zero tests and "untested" comments.
+    This was specifically cited in PR #275 rejection.
+
+# ── Upstream Re-solving Anti-pattern ──────────────────────────
+
+re_solving_rule: |
+  Do NOT add new mechanisms for problems upstream already solved.
+  Example: upstream provides WHISPER_DONT_GENERATE_BINDINGS env var
+  for skipping bindgen. Adding has_libclang() auto-detection is
+  re-solving the same problem with a more fragile approach.
+  Always check upstream.yaml build_system section first.
 
 # ── Git Conventions ───────────────────────────────────────────
 
