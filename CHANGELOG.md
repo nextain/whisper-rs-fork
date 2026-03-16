@@ -1,3 +1,27 @@
+# whisper-rs-nx Changelog
+
+## Fork from upstream whisper-rs
+
+This fork diverged from [upstream whisper-rs](https://codeberg.org/tazz4843/whisper-rs) at commit `4016fdd` (2026-03).
+
+# Version 0.15.1 (whisper-rs-nx) (2026-03)
+
+* **Fork**: Rename to whisper-rs-nx with AI context structure (Apache 2.0 code, CC-BY-SA 4.0 context)
+* **Feature**: Add `cuda-dynamic` feature for runtime CUDA backend loading via dlopen/LoadLibrary
+  * Single binary works on both GPU and non-GPU systems
+  * Two-pass CMake build: CPU-only static + separate CUDA shared library
+  * `load_dynamic_backends()` public API with `std::sync::Once` guard
+* **Fix**: Windows MSVC build support
+  * Gate Linux glibc types behind `#[cfg(target_os = "linux")]` in bundled bindings
+  * Add `_bindgen_c_enum` platform-aware type alias (MSVC `c_int` vs GCC `c_uint`)
+  * Add `has_libclang()` detection with graceful fallback to bundled bindings
+  * Windows DLL search patterns for cuda-dynamic
+* **Example**: Add `test_fallback.rs` demonstrating GPU-to-CPU fallback
+
+---
+
+# Upstream changelog (whisper-rs)
+
 # Version 0.8.0 (-sys bindings 0.6.1) (2023-06-18)
 * Fix CUDA and OpenCL build broken due to missing API headers.
 * Use PIC when building whisper.cpp (fixes building a cdylib on x86 Linux)

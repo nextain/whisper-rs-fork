@@ -1,67 +1,98 @@
-# Running on Arch Linux
+# Building whisper-rs-nx
 
-`sudo pacman -Syy llvm clang cmake`
-`cargo build`
+This fork of [whisper-rs](https://codeberg.org/tazz4843/whisper-rs) adds cuda-dynamic and Windows MSVC support.
 
-# Running on Windows using MSYS2
+## Prerequisites (all platforms)
 
-The following are instructions for building whisper-rs on Windows using the msys2 set of compilers.
+- CMake
+- C++ compiler
+- Rust toolchain (MSRV 1.88.0)
 
-1. install msys2/mingw by following [https://code.visualstudio.com/docs/cpp/config-mingw](
-   `https://code.visualstudio.com/docs/cpp/config-mingw`)
-    1. Install g++ and make within msys2 ucrt64
-        - `pacman -S --needed base-devel mingw-w64-x86_64-toolchain`
-    2. Add the msys2 ucrt64 bin folder to path `C:\msys64\ucrt64\bin`
-2. Install make by running `pacman -S make` in msys2 ucrt66
-3. Set rust to use msys2: by running `rustup toolchain install stable-x86_64-pc-windows-gnu` in Windows Powershell/Cmd
-4. Add `.cargo/config.toml` file in the project with the following contents:
+## Linux (Arch)
 
+```bash
+sudo pacman -Syy llvm clang cmake
+cargo build
 ```
+
+## Linux (Ubuntu/Debian)
+
+```bash
+sudo apt install libclang-dev cmake build-essential
+cargo build
+```
+
+## Windows using MSVC (recommended)
+
+Make sure you have installed:
+
+- Visual Studio C++ Build Tools
+- CMake (add to PATH)
+- LLVM/Clang (for bindgen — `winget install LLVM.LLVM`)
+
+```bash
+cargo build
+```
+
+> **Note**: Once platform-specific pre-generated bindings are available (planned),
+> LLVM will no longer be required for default builds.
+
+### With CUDA (static linking)
+
+1. Install [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads?target_os=Windows)
+2. Set `CUDA_PATH` environment variable
+3. `cargo build --features cuda`
+
+### With cuda-dynamic (runtime GPU loading)
+
+No CUDA SDK needed at build time. GPU is detected at runtime.
+
+```bash
+cargo build --features cuda-dynamic
+```
+
+Place `libggml-cuda.so` (Linux) or `ggml-cuda.dll` (Windows) next to the binary for GPU acceleration. Without them, CPU-only fallback is used automatically.
+
+## Windows using MSYS2/MinGW
+
+1. Install MSYS2 following [VS Code MinGW guide](https://code.visualstudio.com/docs/cpp/config-mingw)
+2. Install toolchain: `pacman -S --needed base-devel mingw-w64-x86_64-toolchain`
+3. Add `C:\msys64\ucrt64\bin` to PATH
+4. Install make: `pacman -S make`
+5. Set Rust target: `rustup toolchain install stable-x86_64-pc-windows-gnu`
+6. Create `.cargo/config.toml`:
+
+```toml
 [target.x86_64-pc-windows-gnu]
 linker = "C:\\msys64\\ucrt64\\bin\\gcc.exe"
 ar = "C:\\msys64\\ucrt64\\bin\\ar.exe"
 ```
 
-5. Run `cargo run`  in Windows Powershell/Cmd
+7. `cargo build`
 
-# Running on Windows using Microsoft Visual Studio C++
+## macOS (Apple Silicon)
 
-It has been reported that it is also possible to build whisper-rs using Visual Studio C++.
+Add to your project's `.cargo/config.toml`:
 
-Make sure you have installed and in the path:
-
-- Visual Studio C++
-- cmake
-- LLVM(clang)
-
-### Instructions (for builds with `cuda` enabled)
-
-1. Download [CUDA](https://developer.nvidia.com/cuda-downloads?target_os=Windows)
-2. Download [Visual Studio with Desktop C++ and Clang enabled](https://visualstudio.microsoft.com/de/downloads/) (see
-   clang link below for installer walkthrough)
-3. Download [CLANG](https://www.wikihow.com/Install-Clang-on-Windows)
-4. Download [CMAKE](https://cmake.org/download/)
-5. Run `where.exe clang`, then
-   `setx LIBCLANG_PATH "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\x64\bin"` or something
-   like that
-6. Restart your shell!!!
-7. Cargo build
-
-# Running on M1 OSX
-
-To build on a M1 Mac, make sure to add the following to your project's `.cargo/config.toml`:
-
-```
+```toml
 [target.aarch64-apple-darwin]
 rustflags = "-lc++ -l framework=Accelerate"
 ```
 
-See https://codeberg.org/tazz4843/whisper-rs/pulls/2 for more information.
+Install CMake:
 
-You also need to have CMake installed. You can obtain this using homebrew:
-
-```
+```bash
 brew install cmake
 ```
 
-CMake can also be installed from https://cmake.org/download/ but `cmake` binary needs to be in your PATH.
+Then `cargo build`.
+
+## Skipping bindgen (pre-generated bindings)
+
+If LLVM/libclang is not available:
+
+```bash
+WHISPER_DONT_GENERATE_BINDINGS=1 cargo build
+```
+
+This uses bundled `sys/src/bindings.rs`. The bundled bindings include platform-specific gates for Linux and Windows.

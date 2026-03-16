@@ -15,6 +15,12 @@ whisper.cpp를 위한 Rust 바인딩 — cuda-dynamic과 Windows MSVC 지원이 
 - **포크 이유**: 업스트림에서 AI 지원 기여를 받지 않음
 - **생태계**: [Naia OS](https://github.com/nextain/naia-os)의 일부 — AI 컴패니언을 위한 음성-텍스트 변환 제공
 
+## 버전 전략
+
+- **현재**: 0.15.1 (upstream 0.15.0 시점에서 포크)
+- **upstream 최신**: 0.16.0
+- **전략**: upstream 버전을 추적하고 포크 전용 변경에는 패치 버전 증가. 다음 upstream 동기화 시 0.16.x로 업데이트 후 포크 패치 추가 (예: 0.16.1-nx).
+
 ## 크레이트 구조
 
 ```

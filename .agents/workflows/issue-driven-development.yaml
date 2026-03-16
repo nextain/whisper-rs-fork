@@ -167,6 +167,34 @@ phases:
       - "Review against same checklist as initial review"
       - "TWO consecutive clean passes required"
 
+  upstream_style_review:
+    description: "Verify all changes conform to upstream whisper-rs conventions"
+    reference: ".agents/context/upstream.yaml"
+    steps:
+      - "Re-read .agents/context/upstream.yaml (refresh upstream conventions)"
+      - "loop:"
+      - "  - Run cargo fmt --check"
+      - "  - Run cargo clippy --all-targets -- -D warnings"
+      - "  - Read EVERY changed .rs file"
+      - "  - For each file, verify against upstream checklist:"
+      - "    □ Formatting matches rustfmt default?"
+      - "    □ Platform cfg uses upstream patterns exactly?"
+      - "    □ Comments are minimal, neutral tone?"
+      - "    □ Error handling: Result not panic?"
+      - "    □ Naming: CamelCase types, snake_case funcs?"
+      - "    □ Imports: rustfmt default grouping (no stricter than upstream)?"
+      - "    □ No naia-os conventions leaked? (Biome, Logger, Korean, tab indent)"
+      - "    □ No unnecessary abstractions?"
+      - "    □ Would upstream maintainer accept this style?"
+      - "  - Fix any violations found"
+      - "  - If TWO consecutive passes find nothing → upstream review complete"
+    rules:
+      - "This review is SEMANTIC — not just cargo fmt/clippy"
+      - "Read upstream code examples for comparison when uncertain"
+      - "Reject any code that would look foreign in the upstream repo"
+      - "Comments must use English, neutral technical tone"
+      - "No structured logger patterns — use cargo:warning in build.rs"
+
   sync:
     description: "Synchronize contexts, record lessons"
     gate: true
@@ -191,7 +219,7 @@ phases:
 
   commit:
     description: "Commit and link to Issue"
-    prerequisite: "ALL prior phases must be complete"
+    prerequisite: "ALL prior phases (including upstream_style_review) must be complete"
     steps:
       - "Stage relevant files only"
       - "Commit with descriptive message referencing Issue number"

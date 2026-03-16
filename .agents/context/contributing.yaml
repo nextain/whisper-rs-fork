@@ -62,7 +62,7 @@ license_protection:
 philosophy:
   ref: ".agents/context/philosophy.yaml"
   must_preserve:
-    - "AI-native development — no anti-AI gatekeeping"
+    - "AI-assisted contributions welcome with transparent attribution"
     - "Privacy first — local execution default"
     - "Transparency — open source, no hidden behavior"
   may_extend:

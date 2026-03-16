@@ -1,0 +1,236 @@
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# Upstream whisper-rs reference — pure upstream analysis
+# Source: codeberg.org/tazz4843/whisper-rs (commit 129b982, 2026-03)
+#
+# This file describes ONLY upstream conventions. No fork-specific content.
+# All code in this repository MUST conform to these conventions.
+
+project:
+  repo: "https://codeberg.org/tazz4843/whisper-rs"
+  license: Unlicense
+  maintainer: "Niko (@niko.lgbt)"
+  rust_edition: "2021"
+  msrv: "1.88.0"
+  versions:
+    whisper_rs: "0.16.0"
+    whisper_rs_sys: "0.15.0"
+  whisper_cpp: "git submodule at sys/whisper.cpp/"
+
+# ── Contribution Rules ────────────────────────────────────────
+
+contribution_rules:
+  pr_checklist:
+    - "Self-review performed"
+    - "Code is legible and maintainable by others"
+    - "Hard-to-understand areas commented"
+    - "Documentation updated where necessary"
+    - "cargo fmt and cargo clippy run"
+  process:
+    - "Issue first, then PR"
+    - "Merge commits reference PR numbers: (#273)"
+    - "Feature flags for new backends"
+    - "Backwards compatibility respected (semver)"
+
+# ── Code Style ────────────────────────────────────────────────
+
+code_style:
+
+  formatting:
+    tool: "rustfmt (default config — .rustfmt.toml is empty)"
+    linting: "cargo clippy"
+    crate_level_allows:
+      - "#![allow(clippy::uninlined_format_args)]"
+    sys_crate_allows:
+      - "#![allow(non_upper_case_globals)]"
+      - "#![allow(non_camel_case_types)]"
+      - "#![allow(non_snake_case)]"
+
+  naming:
+    types: "CamelCase — WhisperContext, FullParams, GGMLLogLevel"
+    functions: "snake_case — path_to_bytes, get_cpp_link_stdlib"
+    constants: "UPPER_SNAKE_CASE — WHISPER_CPP_VERSION"
+    features: "kebab-case — cuda-dynamic, force-debug, raw-api"
+    crate_names: "kebab-case — whisper-rs, whisper-rs-sys"
+
+  comments:
+    density: "Minimal — only where logic isn't self-evident"
+    doc_comments: "On public API items, with C++ equivalent where applicable"
+    doc_pattern: |
+      /// # C++ equivalent
+      /// `struct whisper_context * whisper_init_from_file_with_params_no_state(...);`
+    tone: "Neutral technical language"
+
+  imports:
+    observation: "No strict import ordering enforced — varies across files"
+    common_pattern: |
+      Typically groups by origin, but order between groups is inconsistent.
+      Some files put crate-internal first, others put std first.
+    example_whisper_ctx: |
+      use crate::error::WhisperError;
+      use crate::WhisperTokenId;
+      use std::borrow::Cow;
+      use std::ffi::{c_int, CStr, CString};
+      use std::path::Path;
+    example_lib: |
+      pub use common_logging::GGMLLogLevel;
+      pub use error::WhisperError;
+      pub use standalone::*;
+    rule: "Follow rustfmt default grouping — do not impose stricter order than upstream"
+
+  error_handling:
+    library_code: "Result<T, WhisperError> — never panic"
+    error_type: "WhisperError enum (16 variants, with From<T> conversions)"
+    build_rs: "panic!() acceptable for unrecoverable config errors"
+
+# ── Platform Patterns ─────────────────────────────────────────
+
+platform_patterns:
+
+  general_principle: |
+    Minimal platform code in Rust wrapper.
+    whisper.cpp handles most platform differences via CMake.
+    Rust side only handles: path encoding, enum repr, link flags.
+
+  cfg_patterns:
+    unix_vs_non_unix: |
+      #[cfg(unix)]
+      fn func() { /* unix-specific using OsStrExt */ }
+      #[cfg(not(unix))]
+      fn func() { /* fallback using UTF-8 */ }
+    msvc_enum_repr: |
+      #[cfg_attr(any(not(windows), target_env = "gnu"), repr(u32))]
+      #[cfg_attr(all(windows, not(target_env = "gnu")), repr(i32))]
+      pub enum CEnum { ... }
+    build_rs_platform: |
+      if cfg!(target_os = "windows") { ... }
+      cfg_if::cfg_if! { if #[cfg(target_os = "windows")] { ... } }
+
+  locations:
+    - "src/whisper_ctx.rs:7-25 — path_to_bytes (Unix OsStrExt vs UTF-8)"
+    - "src/common_logging.rs:51-54 — GGMLLogLevel repr (MSVC i32 vs u32)"
+    - "src/whisper_grammar.rs:8-9 — WhisperGrammarElementType repr"
+    - "sys/build.rs:193-196 — /utf-8 cxxflag + advapi32"
+
+# ── Build System ──────────────────────────────────────────────
+
+build_system:
+
+  architecture: |
+    sys/build.rs orchestrates:
+    1. FFI binding generation (bindgen or pre-generated fallback)
+    2. whisper.cpp compilation via cmake crate
+
+  binding_generation:
+    env_var: "WHISPER_DONT_GENERATE_BINDINGS"
+    flow:
+      when_set: "Copy src/bindings.rs → OUT_DIR (skip bindgen)"
+      when_unset: "Run bindgen on wrapper.h → OUT_DIR/bindings.rs"
+      on_bindgen_error: "Fallback: copy src/bindings.rs (with cargo:warning)"
+    consumption: "sys/src/lib.rs: include!(concat!(env!('OUT_DIR'), '/bindings.rs'))"
+
+  pre_generated_bindings:
+    file: "sys/src/bindings.rs"
+    lines: 5964
+    generator: "bindgen 0.72.1"
+    generated_on: "Linux"
+    contents:
+      - "__BindgenBitfieldUnit helpers"
+      - "Opaque structs (whisper_context, whisper_state — zero-size)"
+      - "C enum types with size assertions"
+      - "C struct types with repr(C)"
+      - "extern 'C' function declarations (100+)"
+    cross_platform_issue: |
+      Contains glibc-specific types: _G_fpos_t, _G_fpos64_t, _IO_FILE,
+      _IO_lock_t, __va_list_tag, max_align_t.
+      These have different sizes on Windows (c_long: 4 vs 8 bytes).
+      Size assertion overflow → compile error on Windows.
+
+  bindgen_config:
+    headers:
+      always: "wrapper.h"
+      metal: "whisper.cpp/ggml/include/ggml-metal.h"
+      vulkan: "whisper.cpp/ggml/include/ggml-vulkan.h"
+    clang_args:
+      - "-I./whisper.cpp/"
+      - "-I./whisper.cpp/include"
+      - "-I./whisper.cpp/ggml/include"
+    rust_target: "stable(88, 0)"
+    allowlist: "None (generates everything)"
+    blocklist: "None"
+    callbacks: "bindgen::CargoCallbacks::new()"
+
+  cmake:
+    profile: "Release (RelWithDebInfo for debug)"
+    static: "BUILD_SHARED_LIBS=OFF"
+    env_passthrough: "WHISPER_*, GGML_*, CMAKE_* → CMake defines (except WHISPER_DONT_GENERATE_BINDINGS)"
+    linked_libs:
+      always: [whisper, ggml, ggml-base, ggml-cpu]
+      cuda: [ggml-cuda]
+      metal: [ggml-metal]
+      vulkan: [ggml-vulkan]
+      hipblas: [ggml-hip]
+      openblas: [ggml-blas]
+    windows:
+      cxxflag: "/utf-8"
+      link_lib: "advapi32"
+
+  features:
+    default: "[] — nothing enabled by default"
+    gpu_backends:
+      cuda: "NVIDIA (static, requires CUDA SDK + CUDA_PATH on Windows)"
+      metal: "macOS Metal"
+      vulkan: "Cross-platform (requires VULKAN_SDK)"
+      hipblas: "AMD ROCm (panics on Windows — upstream known issue)"
+      openblas: "CPU BLAS"
+      coreml: "macOS CoreML"
+      intel-sycl: "Intel SYCL (shared linking)"
+    cpu: {openmp: "Parallel CPU execution"}
+    utility:
+      raw-api: "Expose sys crate"
+      log_backend: "Redirect logs to log crate"
+      tracing_backend: "Redirect logs to tracing crate"
+      force-debug: "Debug symbols in release"
+      test-with-tiny-model: "Testing fixture"
+
+# ── API Structure ─────────────────────────────────────────────
+
+api_structure:
+  modules:
+    "src/lib.rs": "Public re-exports, type aliases, install_logging_hooks()"
+    "src/error.rs": "WhisperError enum (16 variants)"
+    "src/whisper_ctx.rs": "WhisperInnerContext (path handling, platform)"
+    "src/whisper_ctx_wrapper.rs": "WhisperContext (Arc wrapper, public API)"
+    "src/whisper_params.rs": "FullParams (transcription config)"
+    "src/whisper_state/": "WhisperState, segments, tokens, iterator"
+    "src/whisper_grammar.rs": "Grammar enums (platform-specific repr)"
+    "src/whisper_vad.rs": "Voice activity detection"
+    "src/utilities.rs": "Audio conversion helpers"
+    "src/standalone.rs": "Version info, language utilities"
+    "src/common_logging.rs": "Log level enum + logging macros"
+    "src/vulkan.rs": "Vulkan device enumeration (feature-gated)"
+  type_alias_pattern: |
+    pub type WhisperSysContext = whisper_rs_sys::whisper_context;
+    pub type WhisperTokenId = whisper_rs_sys::whisper_token;
+
+# ── Windows Support (upstream status) ─────────────────────────
+
+windows_status:
+  supported: [MSVC, "MinGW/MSYS2"]
+  prerequisites: "Visual Studio C++, cmake, LLVM/clang"
+  known_issues:
+    - "Pre-generated bindings are Linux-only (glibc types)"
+    - "HipBLAS panics on Windows (rocm-5.7)"
+    - "No visible Windows CI"
+  platform_code_count: 4  # path, 2x enum repr, build.rs
+
+# ── Git Conventions ───────────────────────────────────────────
+
+git_conventions:
+  commit_style: "No strict convention — mixed styles"
+  examples:
+    - "fix(sys): work around bindgen failing to generate forward-defined structs"
+    - "fix: enable passthrough of GGML_NATIVE"
+    - "Accept Path argument to WhisperContext::new_with_params()"
+    - "Update whisper.cpp"
+  merge: "Merge commits with PR number (#N)"

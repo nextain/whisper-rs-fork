@@ -15,6 +15,12 @@ Rust bindings for whisper.cpp — Nextain fork with cuda-dynamic and Windows MSV
 - **Fork reason**: Upstream does not accept AI-assisted contributions
 - **Ecosystem**: Part of [Naia OS](https://github.com/nextain/naia-os) — provides speech-to-text for the AI companion
 
+## Versioning
+
+- **Current**: 0.15.1 (fork diverged at upstream 0.15.0)
+- **Upstream latest**: 0.16.0
+- **Strategy**: Track upstream versions — bump patch for fork-only changes. Next upstream sync should update to 0.16.x, then add fork patch (e.g., 0.16.1-nx).
+
 ## Crate Structure
 
 ```

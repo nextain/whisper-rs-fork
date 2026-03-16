@@ -8,8 +8,17 @@ project:
   upstream: "https://codeberg.org/tazz4843/whisper-rs"
   upstream_license: Unlicense
   fork_reason: "Upstream does not accept AI-assisted contributions"
-  philosophy: "AI-context-driven development. No manual rewrites to satisfy anti-AI policies."
+  philosophy: "AI-assisted development with transparent attribution"
   ecosystem: "Part of Naia OS ecosystem — provides speech-to-text for the AI companion"
+
+versioning:
+  strategy: "Track upstream versions — bump patch for fork-only changes"
+  current: "0.15.1 (fork diverged at upstream 0.15.0)"
+  upstream_latest: "0.16.0"
+  note: |
+    Fork version lags upstream because upstream bumped to 0.16.0 after our fork point.
+    Next upstream sync should update to 0.16.x, then add fork patch: 0.16.1-nx or similar.
+    The -nx suffix or patch bump distinguishes fork releases from upstream.
 
 crates:
   whisper-rs-nx:

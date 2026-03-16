@@ -11,7 +11,7 @@ Core principles guiding whisper-rs-nx development.
 
 ### AI-Native Development
 
-AI-assisted contributions are the norm, not the exception. We do not manually rewrite AI code to satisfy anti-AI policies. Rich `.agents/` context ensures high-quality AI contributions. AI context files are first-class project infrastructure.
+AI-assisted contributions are welcome alongside human contributions. AI tools are part of the development workflow, with transparent attribution. Rich `.agents/` context ensures high-quality AI contributions. AI context files are first-class project infrastructure.
 
 ### Privacy First
 
@@ -29,6 +29,6 @@ Compose from proven components — don't reinvent. whisper.cpp is the proven STT
 
 Part of the Naia OS ecosystem — speech-to-text for AI companions. Designed for embedding in larger Rust applications. Single-binary deployment via cuda-dynamic avoids CUDA SDK dependency at runtime.
 
-### Vibe Coding Era
+### Context as Infrastructure
 
-AI context files are the new contribution infrastructure. `.agents/` directories encode project philosophy, not just config. Context quality determines AI collaboration quality. Triple-mirror architecture: AI-optimized + English + Korean. CC-BY-SA licensing preserves the contribution chain.
+Structured AI context files improve contribution quality. `.agents/` directories encode project conventions and architecture. Context quality determines AI collaboration quality. Triple-mirror architecture: AI-optimized + English + Korean. CC-BY-SA licensing preserves the contribution chain.
